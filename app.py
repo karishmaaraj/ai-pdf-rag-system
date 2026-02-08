@@ -3,6 +3,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.llms import HuggingFaceHub
+from langchain.chains import RetrievalQA
+import os
 
 # 1. Load PDF
 reader = PdfReader("data/sample.pdf")
@@ -22,13 +24,26 @@ embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-# 4. Store in vector database
+# 4. Store embeddings in FAISS
 vectorstore = FAISS.from_texts(chunks, embeddings)
 
-# 5. Ask a question
-query = "What is this document about?"
-docs = vectorstore.similarity_search(query, k=3)
+# 5. Load LLM (Hugging Face)
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = "YOUR_API_KEY_HERE"
 
-# 6. Print retrieved chunks
-for i, doc in enumerate(docs, 1):
-    print(f"\nChunk {i}:\n", doc.page_content)
+llm = HuggingFaceHub(
+    repo_id="google/flan-t5-base",
+    model_kwargs={"temperature": 0}
+)
+
+# 6. Create Retrieval-QA chain
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=vectorstore.as_retriever()
+)
+
+# 7. Ask a question
+query = "What is this document about?"
+answer = qa_chain.run(query)
+
+print("\nAnswer:")
+print(answer)
